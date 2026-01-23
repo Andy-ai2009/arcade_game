@@ -1,5 +1,6 @@
 import random
 import arcade
+from arcade.camera import Camera2D
 
 from game_data import (
     SCREEN_WIDTH,
@@ -21,6 +22,8 @@ from game_data import (
     ENEMY_SPRITE,
     SHARD_SPRITE,
     EXIT_SPRITE,
+    WORLD_WIDTH,
+    EXIT_X,
 )
 
 
@@ -70,6 +73,9 @@ class GameView(arcade.View):
         self.shards_required = 0
         self.exit_open = False
         self.idle_time = 0.0
+        self.world_camera = Camera2D()
+        self.gui_camera = Camera2D()
+        self.world_width = WORLD_WIDTH
 
     def setup(self):
         arcade.set_background_color(arcade.color.BLACK)
@@ -90,7 +96,7 @@ class GameView(arcade.View):
         self.player.center_y = 140
         self.player_list.append(self.player)
 
-        for x in range(0, 1400, 64):
+        for x in range(0, self.world_width + 64, 64):
             tile = arcade.Sprite(FLOOR_TILE, 0.5)
             tile.center_x = x
             tile.center_y = 32
@@ -130,7 +136,7 @@ class GameView(arcade.View):
             self.enemy_list.append(enemy)
 
         exit_sprite = arcade.Sprite(EXIT_SPRITE, 0.7)
-        exit_sprite.center_x = 1360
+        exit_sprite.center_x = EXIT_X
         exit_sprite.center_y = 100
         exit_sprite.alpha = 120
         self.exit_list.append(exit_sprite)
@@ -141,12 +147,14 @@ class GameView(arcade.View):
 
     def on_draw(self):
         self.clear()
+        self.world_camera.use()
         self.wall_list.draw()
         self.shard_list.draw()
         self.enemy_list.draw()
         self.exit_list.draw()
         self.player_list.draw()
 
+        self.gui_camera.use()
         arcade.draw_text(
             f"Shards: {self.shards_collected}/{self.shards_required}",
             20,
@@ -185,6 +193,7 @@ class GameView(arcade.View):
 
         self.update_unstable(delta_time)
         self.update_enemies()
+        self.update_camera()
 
     def update_unstable(self, delta_time):
         if self.idle_time < IDLE_TRIGGER_TIME:
@@ -210,6 +219,15 @@ class GameView(arcade.View):
             enemy.center_x += enemy.change_x
             if enemy.center_x < enemy.patrol_left or enemy.center_x > enemy.patrol_right:
                 enemy.change_x *= -1
+
+    def update_camera(self):
+        target_x = max(
+            self.window.width / 2,
+            min(self.world_width - self.window.width / 2, self.player.center_x),
+        )
+        target_y = self.window.height / 2
+        self.world_camera.position = (target_x, target_y)
+        self.gui_camera.position = (self.window.width / 2, self.window.height / 2)
 
     def on_key_press(self, key, modifiers):
         self.keys_pressed.add(key)
