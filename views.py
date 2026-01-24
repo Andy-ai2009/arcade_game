@@ -73,6 +73,8 @@ class GameView(arcade.View):
         self.shards_required = 0
         self.exit_open = False
         self.idle_time = 0.0
+        self.freeze_timer = 0.0
+        self.background = None
         self.world_camera = Camera2D()
         self.gui_camera = Camera2D()
         self.world_width = WORLD_WIDTH
@@ -90,6 +92,9 @@ class GameView(arcade.View):
         self.shards_collected = 0
         self.exit_open = False
         self.idle_time = 0.0
+        self.freeze_timer = 0.0
+
+        self.background = arcade.load_texture(":resources:images/backgrounds/stars.png")
 
         self.player = arcade.Sprite(PLAYER_SPRITE, 0.42)
         self.player.center_x = 80
@@ -102,12 +107,14 @@ class GameView(arcade.View):
             tile.center_y = 32
             self.wall_list.append(tile)
 
+        platform_heights = {}
         for i, (x, y) in enumerate(PLATFORM_POINTS):
             texture = PLATFORM_A if i % 2 == 0 else PLATFORM_B
             platform = arcade.Sprite(texture, 0.5)
             platform.center_x = x
             platform.center_y = y
             self.wall_list.append(platform)
+            platform_heights[x] = y
 
         for x, y, mode in UNSTABLE_PLATFORMS:
             platform = arcade.Sprite(PLATFORM_A, 0.5)
@@ -118,11 +125,13 @@ class GameView(arcade.View):
             platform.visible = True
             self.wall_list.append(platform)
             self.unstable_list.append(platform)
+            platform_heights[x] = y
 
         for x in SHARD_X:
             shard = arcade.Sprite(SHARD_SPRITE, 0.7)
             shard.center_x = x
-            shard.center_y = 280
+            base_y = platform_heights.get(x, 140)
+            shard.center_y = base_y + 60
             self.shard_list.append(shard)
         self.shards_required = len(SHARD_X)
 
@@ -148,6 +157,16 @@ class GameView(arcade.View):
     def on_draw(self):
         self.clear()
         self.world_camera.use()
+        if self.background:
+            arcade.draw_texture_rect(
+                self.background,
+                arcade.rect.XYWH(
+                    self.world_width / 2,
+                    self.window.height / 2,
+                    self.world_width,
+                    self.window.height,
+                ),
+            )
         self.wall_list.draw()
         self.shard_list.draw()
         self.enemy_list.draw()
@@ -175,6 +194,8 @@ class GameView(arcade.View):
             self.idle_time += delta_time
         else:
             self.idle_time = 0.0
+            self.freeze_timer = 2.0
+            self. lock_unstable()
 
         self.physics_engine.update()
 
@@ -196,6 +217,9 @@ class GameView(arcade.View):
         self.update_camera()
 
     def update_unstable(self, delta_time):
+        if self.freeze_timer > 0:
+            self.freeze_timer -= delta_time
+            return
         if self.idle_time < IDLE_TRIGGER_TIME:
             return
 
@@ -228,6 +252,14 @@ class GameView(arcade.View):
         target_y = self.window.height / 2
         self.world_camera.position = (target_x, target_y)
         self.gui_camera.position = (self.window.width / 2, self.window.height / 2)
+
+    def lock_unstable(self):
+        for plat in self.unstable_list:
+            plat.timer = 0.0
+            plat.visible = True
+            plat.alpha = 255
+            if plat not in self.wall_list:
+                self.wall_list.append(plat)
 
     def on_key_press(self, key, modifiers):
         self.keys_pressed.add(key)
