@@ -258,6 +258,7 @@ class GameView(arcade.View):
         self.update_unstable(delta_time)
         self.update_enemies(delta_time)
         self.update_enemy_bullets(delta_time)
+        self.check_enemy_stomp()
         self.update_camera()
 
     def update_unstable(self, delta_time):
@@ -320,6 +321,13 @@ class GameView(arcade.View):
             self.player.center_x = 80
             self.player.center_y = 140
             self.keys_pressed.clear()
+
+    def check_enemy_stomp(self):
+        hits = arcade.check_for_collision_with_list(self.player, self.enemy_list)
+        for enemy in hits:
+            if self.player.change_y < 0 and self.player.center_y > enemy.center_y + 10:
+                enemy.remove_from_sprite_lists()
+                self.player.change_y = JUMP_SPEED * 0.5
 
     def update_camera(self):
         target_x = max(
