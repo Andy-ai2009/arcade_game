@@ -1,9 +1,9 @@
 import random
+
 import arcade
 from arcade.camera import Camera2D
 
 from game_data import (
-    SCREEN_WIDTH,
     SCREEN_HEIGHT,
     PLAYER_SPEED,
     JUMP_SPEED,
@@ -56,6 +56,36 @@ class StartView(arcade.View):
         self.window.show_view(game_view)
 
 
+class GameOverView(arcade.View):
+    def on_show(self):
+        arcade.set_background_color(arcade.color.BLACK)
+
+    def on_draw(self):
+        self.clear()
+        arcade.draw_text(
+            "GAME OVER",
+            self.window.width / 2,
+            self.window.height / 2,
+            arcade.color.RED,
+            30,
+            anchor_x="center",
+        )
+        arcade.draw_text(
+            "Press R to restart",
+            self.window.width / 2,
+            self.window.height / 2 - 40,
+            arcade.color.LIGHT_GRAY,
+            16,
+            anchor_x="center",
+        )
+
+    def on_key_press(self, key, modifiers):
+        if key == arcade.key.R:
+            game_view = GameView()
+            game_view.setup()
+            self.window.show_view(game_view)
+
+
 class GameView(arcade.View):
     def __init__(self):
         super().__init__()
@@ -63,6 +93,7 @@ class GameView(arcade.View):
         self.player_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList(use_spatial_hash=True)
         self.enemy_list = arcade.SpriteList()
+        self.enemy_bullets = arcade.SpriteList()
         self.shard_list = arcade.SpriteList()
         self.exit_list = arcade.SpriteList()
         self.unstable_list = arcade.SpriteList()
@@ -78,6 +109,7 @@ class GameView(arcade.View):
         self.world_camera = Camera2D()
         self.gui_camera = Camera2D()
         self.world_width = WORLD_WIDTH
+        self.lives = 5
 
     def setup(self):
         arcade.set_background_color(arcade.color.BLACK)
@@ -85,6 +117,7 @@ class GameView(arcade.View):
         self.player_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList(use_spatial_hash=True)
         self.enemy_list = arcade.SpriteList()
+        self.enemy_bullets = arcade.SpriteList()
         self.shard_list = arcade.SpriteList()
         self.exit_list = arcade.SpriteList()
         self.unstable_list = arcade.SpriteList()
@@ -93,6 +126,7 @@ class GameView(arcade.View):
         self.exit_open = False
         self.idle_time = 0.0
         self.freeze_timer = 0.0
+        self.lives = 5
 
         self.background = arcade.load_texture(":resources:images/backgrounds/stars.png")
 
@@ -116,8 +150,8 @@ class GameView(arcade.View):
             self.wall_list.append(platform)
             platform_heights[x] = y
 
-        for x, y, mode in UNSTABLE_PLATFORMS:
-            platform = arcade.Sprite(PLATFORM_A, 0.5)
+            for x, y, mode in UNSTABLE_PLATFORMS:
+                platform = arcade.Sprite(PLATFORM_A, 0.5)
             platform.center_x = x
             platform.center_y = y
             platform.mode = mode
@@ -142,6 +176,7 @@ class GameView(arcade.View):
             enemy.patrol_left = left
             enemy.patrol_right = right
             enemy.change_x = 1.2
+            enemy.shoot_timer = 0.0
             self.enemy_list.append(enemy)
 
         exit_sprite = arcade.Sprite(EXIT_SPRITE, 0.7)
@@ -170,6 +205,7 @@ class GameView(arcade.View):
         self.wall_list.draw()
         self.shard_list.draw()
         self.enemy_list.draw()
+        self.enemy_bullets.draw()
         self.exit_list.draw()
         self.player_list.draw()
 
@@ -178,6 +214,13 @@ class GameView(arcade.View):
             f"Shards: {self.shards_collected}/{self.shards_required}",
             20,
             self.window.height - 30,
+            arcade.color.WHITE,
+            16,
+        )
+        arcade.draw_text(
+            f"Lives: {self.lives}",
+            20,
+            self.window.height - 55,
             arcade.color.WHITE,
             16,
         )
@@ -195,7 +238,7 @@ class GameView(arcade.View):
         else:
             self.idle_time = 0.0
             self.freeze_timer = 2.0
-            self. lock_unstable()
+            self.lock_unstable()
 
         self.physics_engine.update()
 
@@ -213,7 +256,8 @@ class GameView(arcade.View):
             return
 
         self.update_unstable(delta_time)
-        self.update_enemies()
+        self.update_enemies(delta_time)
+        self.update_enemy_bullets(delta_time)
         self.update_camera()
 
     def update_unstable(self, delta_time):
@@ -238,11 +282,44 @@ class GameView(arcade.View):
                 plat.center_x = random.randint(200, 1200)
                 plat.center_y = random.choice([180, 220, 260])
 
-    def update_enemies(self):
+    def update_enemies(self, delta_time):
         for enemy in self.enemy_list:
             enemy.center_x += enemy.change_x
             if enemy.center_x < enemy.patrol_left or enemy.center_x > enemy.patrol_right:
                 enemy.change_x *= -1
+            enemy.shoot_timer += delta_time
+            if enemy.shoot_timer > 3.5:
+                enemy.shoot_timer = 0.0
+                bullet = arcade.Sprite(":resources:images/space_shooter/laserBlue01.png", 0.5)
+                bullet.center_x = enemy.center_x
+                bullet.center_y = enemy.center_y
+                dx = self.player.center_x - enemy.center_x
+                dy = self.player.center_y - enemy.center_y
+                length = max(1, (dx ** 2 + dy ** 2) ** 0.5)
+                bullet.change_x = dx / length * 6
+                bullet.change_y = dy / length * 6
+                self.enemy_bullets.append(bullet)
+
+    def update_enemy_bullets(self, delta_time):
+        for bullet in list(self.enemy_bullets):
+            bullet.center_x += bullet.change_x
+            bullet.center_y += bullet.change_y
+            if (
+                    bullet.center_x < 0
+                    or bullet.center_x > self.world_width
+                    or bullet.center_y < 0
+                    or bullet.center_y > SCREEN_HEIGHT
+            ):
+                bullet.remove_from_sprite_lists()
+        if arcade.check_for_collision_with_list(self.player, self.enemy_bullets):
+            self.lives -= 1
+            if self.lives <= 0:
+                self.window.show_view(GameOverView())
+                return
+            self.enemy_bullets.clear()
+            self.player.center_x = 80
+            self.player.center_y = 140
+            self.keys_pressed.clear()
 
     def update_camera(self):
         target_x = max(
