@@ -84,6 +84,8 @@ class GameOverView(arcade.View):
             game_view = GameView()
             game_view.setup()
             self.window.show_view(game_view)
+        if key == arcade.key.ESCAPE:
+            self.window.close()
 
 
 class GameView(arcade.View):
