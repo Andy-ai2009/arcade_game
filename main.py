@@ -1,7 +1,7 @@
 import arcade
 
 from game_data import SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE
-from views import StartView, GameOverView
+from views import StartView
 
 
 def main():

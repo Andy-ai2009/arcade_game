@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 import arcade
 from arcade.camera import Camera2D
 
@@ -310,6 +311,7 @@ class GameView(arcade.View):
                 next_view.setup()
                 self.window.show_view(next_view)
             else:
+                self.save_run("win")
                 self.window.show_view(WinView())
             return
 
@@ -373,6 +375,7 @@ class GameView(arcade.View):
         if arcade.check_for_collision_with_list(self.player, self.enemy_bullets):
             self.lives -= 1
             if self.lives <= 0:
+                self.save_run("game_over")
                 self.window.show_view(GameOverView(self.level_index))
                 return
             self.enemy_bullets.clear()
@@ -421,3 +424,9 @@ class GameView(arcade.View):
     def on_key_release(self, key, modifiers):
         if key in self.keys_pressed:
             self.keys_pressed.remove(key)
+
+    def save_run(self, status):
+        path = Path(__file__).parent / "stats.csv"
+        line = f"{self.level_index},{status},{self.shards_collected},{self.lives}\n"
+        with path.open("a") as f:
+            f.write(line)
