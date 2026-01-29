@@ -146,6 +146,10 @@ class GameView(arcade.View):
         self.lives = 5
         self.level_data = LEVELS[self.level_index]
         self.level_gravity = GRAVITY
+        self.snd_collect = arcade.load_sound(":resources:/sounds/coin1.wav")
+        self.snd_hit = arcade.load_sound(":resources:/sounds/hit3.wav")
+        self.snd_jump = arcade.load_sound(":resources:/sounds/jump1.wav")
+        self.snd_shoot = arcade.load_sound(":resources:/sounds/laser1.wav")
 
     def setup(self):
         arcade.set_background_color(arcade.color.BLACK)
@@ -299,6 +303,7 @@ class GameView(arcade.View):
         for shard in arcade.check_for_collision_with_list(self.player, self.shard_list):
             shard.remove_from_sprite_lists()
             self.shards_collected += 1
+            arcade.play_sound(self.snd_collect, volume=0.4)
 
         if self.shards_collected >= self.shards_required:
             self.exit_open = True
@@ -360,6 +365,7 @@ class GameView(arcade.View):
                 bullet.change_x = dx / length * 6
                 bullet.change_y = dy / length * 6
                 self.enemy_bullets.append(bullet)
+                arcade.play_sound(self.snd_shoot, volume=0.25)
 
     def update_enemy_bullets(self, delta_time):
         for bullet in list(self.enemy_bullets):
@@ -382,6 +388,7 @@ class GameView(arcade.View):
             self.player.center_x = 80
             self.player.center_y = 140 if not self.level_data.get("ceiling") else SCREEN_HEIGHT - 140
             self.keys_pressed.clear()
+            arcade.play_sound(self.snd_hit, volume=0.5)
 
     def check_enemy_stomp(self):
         hits = arcade.check_for_collision_with_list(self.player, self.enemy_list)
@@ -393,6 +400,7 @@ class GameView(arcade.View):
                 enemy.remove_from_sprite_lists()
                 bounce_dir = 1 if self.level_gravity >= 0 else -1
                 self.player.change_y = JUMP_SPEED * 0.5 * bounce_dir
+                arcade.play_sound(self.snd_hit, volume=0.4)
 
     def update_camera(self):
         target_x = max(
@@ -417,11 +425,13 @@ class GameView(arcade.View):
             if self.level_gravity < 0:
                 if self.physics_engine.can_jump() or abs(self.player.change_y) < 0.01:
                     self.player.change_y = -JUMP_SPEED * 0.8
+                    arcade.play_sound(self.snd_jump, volume=0.4)
             else:
                 if self.physics_engine.can_jump():
                     self.player.change_y = JUMP_SPEED
+                    arcade.play_sound(self.snd_jump, volume=0.4)
 
-    def on_key_release(self, key, modifiers):
+    def on_key_release(self, key , modifiers):
         if key in self.keys_pressed:
             self.keys_pressed.remove(key)
 
